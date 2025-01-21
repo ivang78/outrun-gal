@@ -123,7 +123,7 @@ void draw_road() {
 void calc_road() {
 	char oth_y_p2;
 	int z;
-	if (road_pos >= 30 && road_pos < 60) {
+	/*if (road_pos >= 30 && road_pos < 60) {
 		road_curve = 1;
 	} else if (road_pos >= 60 && road_pos < 90) {
 		road_curve = 2;
@@ -139,7 +139,7 @@ void calc_road() {
 		road_curve = -1;
 	} else if (road_pos >= 240) {
 		road_curve = 0;
-	}
+	}*/
 	// clear road if curve change
 	if (road_curve != road_curve_old) {
 		road_curve_old = road_curve;
@@ -163,6 +163,7 @@ void calc_road() {
 		}
 		if (oth_y_pos > MY_START_Y_POS || oth_y_pos < OTH_START_Y_POS) {
 			oth_position = 0;
+			oth_y_pos = 0;
 		}
 	}
 	if (oth_position == 0 && road_pos > 0 && road_pos%100 == 0) {
@@ -182,14 +183,17 @@ void calc_road() {
  */
 void check_collision () {
 	unsigned char is_crash = 0;	
-	if (my_x_pos < ROAD_CENTER - ROAD_HALF + 1) {
-		gal_gotoxy(13, 15); gal_puts("CRASH!");
+	// crash with ground
+	if (my_x_pos < ROAD_CENTER - ROAD_HALF + 1 || my_x_pos > ROAD_CENTER + ROAD_HALF + 1 - SPRITE_WIDTH)  {
 		is_crash = 1;
-		my_speed = 0;
 	}
-	if (my_x_pos > ROAD_CENTER + ROAD_HALF + 1 - SPRITE_WIDTH ) {
-		gal_gotoxy(13, 15); gal_puts("CRASH!");
+	// crash with other car
+	if (oth_y_pos > my_y_pos - 3 && oth_y_pos < my_y_pos + 3 && !(oth_x_pos + SPRITE_WIDTH < my_x_pos || oth_x_pos > my_x_pos + SPRITE_WIDTH)) {
 		is_crash = 1;
+	}
+	if (is_crash == 1) {
+		gal_gotoxy(13, 15); gal_puts("CRASH!");
+		draw_sprite(my_x_pos, my_y_pos, SPRITE_N_MY, SPRITE_DRAW);
 		my_speed = 0;
 	}
 	crash = is_crash;
