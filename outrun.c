@@ -2,11 +2,12 @@
 #include <conio.h>
 #include <time.h>
 #include "galaksija.h"
-char my_x_pos, my_y_pos, my_speed, road_curve, road_curve_old;
+char my_x_pos, my_y_pos, my_speed, road_curve, road_curve_old, curve_x_delta;
 char oth_position, oth_x_pos, oth_y_pos, oth_speed;
 unsigned int oth_virtual_y_pos;
 char crash;
 unsigned int road_pos;
+unsigned int next_curve_pos, next_car_pos;
 char c;
 char sprite[48] = {
   0xc0, 0xd8, 0xcc, 0xcc, 0xcc, 0xcc, 0xe4, 0xc0, 0xe0, 0xc6, 0xc3, 0xcb, 0xc7, 0xc3, 0xc9, 0xd0,
@@ -121,25 +122,39 @@ void draw_road() {
 	calc road
  */
 void calc_road() {
-	char oth_y_p2;
+	char oth_y_p2, curve_dir, curve_next;
 	int z;
-	/*if (road_pos >= 30 && road_pos < 60) {
-		road_curve = 1;
-	} else if (road_pos >= 60 && road_pos < 90) {
-		road_curve = 2;
-	} else if (road_pos >= 90 && road_pos < 120) {
-		road_curve = 1;
-	} else if (road_pos >= 120 && road_pos < 150) {
-		road_curve = 0;
-	} else if (road_pos >= 150 && road_pos < 180) {
-		road_curve = -1;
-	} else if (road_pos >= 180 && road_pos < 210) {
-		road_curve = -2;
-	} else if (road_pos >= 210 && road_pos < 240) {
-		road_curve = -1;
-	} else if (road_pos >= 240) {
-		road_curve = 0;
-	}*/
+	char nstr[10];
+	// calc next road condition
+	if (road_pos >= next_curve_pos) {
+		next_curve_pos = road_pos + (rand() / (RAND_MAX / 50));		
+		// dir may be -1, 0 or 1
+		curve_dir = (rand() / (RAND_MAX / 3)) - 1;
+		curve_next = road_curve + curve_dir;
+		if (curve_next > -3 && curve_next < 3) { 
+			road_curve = curve_next;
+		}
+		curve_x_delta = road_curve;
+		if (curve_x_delta < -1) {
+			curve_x_delta = -1;
+		} else if (curve_x_delta > 1) {
+			curve_x_delta = 1;
+		} 
+
+/*
+gal_gotoxy(0, 0); 
+gal_puts("            "); 
+itoa(curve_next, nstr, 10); 
+gal_gotoxy(0, 0); 
+gal_puts(nstr);			
+itoa(road_curve, nstr, 10); 
+gal_gotoxy(3, 0); 
+gal_puts(nstr);			
+itoa(next_curve_pos, nstr, 10); 
+gal_gotoxy(6, 0); 
+gal_puts(nstr);
+*/
+	} 
 	// clear road if curve change
 	if (road_curve != road_curve_old) {
 		road_curve_old = road_curve;
@@ -193,7 +208,6 @@ void check_collision () {
 	}
 	if (is_crash == 1) {
 		gal_gotoxy(13, 15); gal_puts("CRASH!");
-		draw_sprite(my_x_pos, my_y_pos, SPRITE_N_MY, SPRITE_DRAW);
 		my_speed = 0;
 	}
 	crash = is_crash;
@@ -213,8 +227,11 @@ int main() {
 		my_x_pos = MY_START_X_POS;
 		my_y_pos = MY_START_Y_POS;
 		road_pos = 0;
+		next_curve_pos = 100;
+		next_car_pos = 0;
 		road_curve = 0;
 		road_curve_old = 0;
+		curve_x_delta = 0;
 		crash = 0;
 		my_speed = 0;
 		oth_position = 0;
@@ -252,9 +269,9 @@ int main() {
 				default:
 					break;
 			}
-			if (road_curve != 0 && road_pos%3 == 0) {
+			if (road_curve != 0 && my_speed > 0 && road_pos%3 == 0) {
 				draw_sprite(my_x_pos, my_y_pos, SPRITE_N_MY, SPRITE_CLEAR);
-				my_x_pos = my_x_pos - road_curve;
+				my_x_pos = my_x_pos - curve_x_delta;
 				draw_sprite(my_x_pos, my_y_pos, SPRITE_N_MY, SPRITE_DRAW);
 			}
 			check_collision();
