@@ -5,7 +5,7 @@
 char my_x_pos, my_y_pos, my_speed, road_curve, road_curve_old, curve_x_delta;
 char oth_position, oth_x_pos, oth_y_pos, oth_speed;
 unsigned int oth_virtual_y_pos;
-char crash;
+char collision;
 unsigned int road_pos;
 unsigned int next_curve_pos, next_car_pos;
 char c;
@@ -29,16 +29,18 @@ char cont = 1;
 #define SPRITE_N_MY 0
 #define SPRITE_N_OTHER 1
 
-#define ROAD_Y_START 14
+#define ROAD_Y_START 13
 #define ROAD_Y_SIZE 10
 #define ROAD_Y_CURVE 4
-#define ROAD_HALF 14
+#define ROAD_HALF 13
 #define ROAD_CENTER 15
 
 #define MY_START_X_POS 12
-#define MY_START_Y_POS 12
+#define MY_START_Y_POS 11
 
 #define OTH_START_Y_POS 5
+
+#define MAX_COLLISION 10
 
 /*
 	draw sprite
@@ -65,9 +67,11 @@ void draw_sprite(char xp, char yp, char n, char p) {
 */
 void draw_bg() {
 	for (char i = 0; i < 96; i++) {
-		z80_bpoke(SCREEN_ADDR + 64 + i, bg[i]);
+		z80_bpoke(SCREEN_ADDR + 32 + i, bg[i]);
 	}
-	gal_gotoxy(13, 15); gal_puts(" RUN! ");
+	gal_gotoxy(1, 15); gal_puts("SPEED      ");
+	gal_gotoxy(19, 15); gal_puts("SCORE 0    ");
+	gal_gotoxy(13, 0); gal_puts(" RUN! ");
 }
 
 /*
@@ -77,6 +81,8 @@ void draw_road() {
 	char yp0;
 	char road_char, road_half_persp, rc, rcd, road_curv_persp;
 	int addr0 = SCREEN_ADDR, addr1;
+	char nstr[10];
+	
 	road_half_persp = ROAD_HALF;
 	rc = 0;
 	rcd = 0;
@@ -85,9 +91,9 @@ void draw_road() {
 	}
 	for (char j = 0; j < ROAD_Y_SIZE; j++) {		
 		if (j%2 == road_pos%2) {
-			road_char = 132; // 204;
+			road_char = 196; // 204;
 		} else {
-			road_char = 145; // 243;
+			road_char = 209; // 243;
 		}
 		addr1 = addr0 + ((ROAD_Y_START - j) << 5);
 		road_curv_persp = rc >> 4;
@@ -115,7 +121,26 @@ void draw_road() {
 		road_half_persp--;
 		rc = rc + rcd;
 	}
+	// draw score
+	if (road_pos%8 == 0) {
+		itoa(road_pos, nstr, 10);
+		gal_gotoxy(25, 15); gal_puts(nstr);
+	}
 	road_pos = road_pos + my_speed;
+}
+
+/*
+	draw speed
+*/
+void draw_speed() {
+	gal_gotoxy(7, 15);
+	gal_putc(214);
+	if (my_speed == 0) {
+		gal_putc(231); gal_putc(195);
+	} else {
+		gal_putc(227); gal_putc(199);
+	}
+	gal_putc(212);
 }
 
 /*
@@ -124,9 +149,8 @@ void draw_road() {
 void calc_road() {
 	char oth_y_p2, curve_dir, curve_next;
 	int z;
-	char nstr[10];
 	// calc next road condition
-	if (road_pos >= next_curve_pos) {
+	if (road_pos >= next_curve_pos && oth_position == 0) {
 		next_curve_pos = road_pos + (rand() / (RAND_MAX / 50));		
 		// dir may be -1, 0 or 1
 		curve_dir = (rand() / (RAND_MAX / 3)) - 1;
@@ -140,26 +164,12 @@ void calc_road() {
 		} else if (curve_x_delta > 1) {
 			curve_x_delta = 1;
 		} 
-
-/*
-gal_gotoxy(0, 0); 
-gal_puts("            "); 
-itoa(curve_next, nstr, 10); 
-gal_gotoxy(0, 0); 
-gal_puts(nstr);			
-itoa(road_curve, nstr, 10); 
-gal_gotoxy(3, 0); 
-gal_puts(nstr);			
-itoa(next_curve_pos, nstr, 10); 
-gal_gotoxy(6, 0); 
-gal_puts(nstr);
-*/
 	} 
 	// clear road if curve change
 	if (road_curve != road_curve_old) {
 		road_curve_old = road_curve;
 		for (z = 0; z < 320; z++) {
-			z80_bpoke(SCREEN_ADDR + 160 + z, 32);
+			z80_bpoke(SCREEN_ADDR + 128 + z, 32);
 		}
 		draw_sprite(my_x_pos, my_y_pos, SPRITE_N_MY, SPRITE_DRAW);
 	}
@@ -207,10 +217,18 @@ void check_collision () {
 		is_crash = 1;
 	}
 	if (is_crash == 1) {
-		gal_gotoxy(13, 15); gal_puts("CRASH!");
+		gal_gotoxy(13, 0); gal_puts("CRASH!");
+		draw_speed();
 		my_speed = 0;
+		collision--;
+		if (collision == 0) {
+			gal_gotoxy(11, 0); gal_puts("YOU LOOSE!");
+			do {
+				c = fgetc_cons();
+			} while (c != 10 && c != 0);
+			c = 255;
+		}
 	}
-	crash = is_crash;
 }
 
 /*
@@ -232,13 +250,14 @@ int main() {
 		road_curve = 0;
 		road_curve_old = 0;
 		curve_x_delta = 0;
-		crash = 0;
+		collision = MAX_COLLISION;
 		my_speed = 0;
 		oth_position = 0;
 		oth_y_pos = 0;
 		oth_virtual_y_pos = 0;
 		oth_speed = 0;
 		
+		draw_speed();
 		draw_sprite(my_x_pos, my_y_pos, SPRITE_N_MY, SPRITE_DRAW);		
 		do {
 			calc_road();
@@ -256,11 +275,13 @@ int main() {
 					draw_sprite(my_x_pos, my_y_pos, SPRITE_N_MY, SPRITE_DRAW);
 					break;
 				case 43: // up
-					gal_gotoxy(13, 15); gal_puts("      ");
+					gal_gotoxy(13, 0); gal_puts("      ");
 					my_speed = 1;
+					draw_speed();
 					break;
 				case 44: // down
 					my_speed = 0;
+					draw_speed();
 					break;
 				case 67: // del
 					cont = 0;
@@ -269,7 +290,7 @@ int main() {
 				default:
 					break;
 			}
-			if (road_curve != 0 && my_speed > 0 && road_pos%3 == 0) {
+			if (road_curve != 0 && my_speed > 0 && road_pos%2 == 0) {
 				draw_sprite(my_x_pos, my_y_pos, SPRITE_N_MY, SPRITE_CLEAR);
 				my_x_pos = my_x_pos - curve_x_delta;
 				draw_sprite(my_x_pos, my_y_pos, SPRITE_N_MY, SPRITE_DRAW);
