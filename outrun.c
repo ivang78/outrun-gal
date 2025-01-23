@@ -3,9 +3,9 @@
 #include <time.h>
 #include "galaksija.h"
 char my_x_pos, my_y_pos, my_speed, road_curve, road_curve_old, curve_x_delta;
-char oth_position, oth_x_pos, oth_y_pos, oth_speed;
+char oth_position, oth_x_pos, oth_y_pos, oth_speed, oth_x_delta;
 unsigned int oth_virtual_y_pos;
-char collision;
+char collision, crash;
 unsigned int road_pos;
 unsigned int next_curve_pos, next_car_pos;
 char c;
@@ -63,15 +63,46 @@ void draw_sprite(char xp, char yp, char n, char p) {
 }
 
 /*
+	Welcome frame
+*/
+void frame() {
+	char j;
+	gal_gotoxy(10 ,3); gal_puts("OUTRUN GAME");
+	gal_gotoxy(2,6);  gal_puts("ARROW LEFT, RIGHT - STEERING");
+	gal_gotoxy(2,7);  gal_puts("ARROW UP - ACCELERATE");
+	gal_gotoxy(2,8);  gal_puts("ARROW DOWN - BRAKE");
+	gal_gotoxy(2,9);  gal_puts("DEL - QUIT");
+	gal_gotoxy(2,10); gal_puts("PRESS ENTER");	
+	gal_gotoxy(2,13); gal_puts("BY IVAN ILYICHEV 2024"); 
+	do {
+	} while (getk() != 10);
+}
+
+/*
 	draw background
 */
 void draw_bg() {
 	for (char i = 0; i < 96; i++) {
 		z80_bpoke(SCREEN_ADDR + 32 + i, bg[i]);
 	}
-	gal_gotoxy(1, 15); gal_puts("SPEED      ");
-	gal_gotoxy(19, 15); gal_puts("SCORE 0    ");
-	gal_gotoxy(13, 0); gal_puts(" RUN! ");
+	gal_gotoxy(1, 15); gal_puts("SPEED");
+	gal_gotoxy(19, 15); gal_puts("SCORE 0");
+	gal_gotoxy(14, 0); gal_puts("RUN!");
+}
+
+/*
+	scroll background
+*/
+void scroll_bg() {
+	char bb0;
+	int base_addr = SCREEN_ADDR + 32;	
+	for (int j = 0; j < 3; j++) {
+		bb0 = z80_bpeek(base_addr + (j << 5));
+		for (char i = 1; i < 32; i++) {
+			z80_bpoke(base_addr + (j << 5) + i - 1, z80_bpeek(base_addr + (j << 5) + i));
+		}
+		z80_bpoke(base_addr + (j << 5) + 31, bb0);
+	}
 }
 
 /*
@@ -111,9 +142,9 @@ void draw_road() {
 		// calculate other car position
 		if (oth_position > 0 && ROAD_Y_START - j == oth_y_pos) {
 			if (oth_position == 1) {
-				oth_x_pos = ROAD_CENTER - road_half_persp + road_curv_persp + 1;
+				oth_x_pos = ROAD_CENTER - road_half_persp + road_curv_persp + 1 + oth_x_delta;
 			} else {
-				oth_x_pos = ROAD_CENTER + road_half_persp + road_curv_persp - SPRITE_WIDTH + 1;
+				oth_x_pos = ROAD_CENTER + road_half_persp + road_curv_persp - SPRITE_WIDTH + 1 - oth_x_delta;
 			}
 			draw_sprite(oth_x_pos, oth_y_pos, SPRITE_N_OTHER, SPRITE_DRAW);
 		}
@@ -151,7 +182,7 @@ void calc_road() {
 	int z;
 	// calc next road condition
 	if (road_pos >= next_curve_pos && oth_position == 0) {
-		next_curve_pos = road_pos + (rand() / (RAND_MAX / 50));		
+		next_curve_pos = road_pos + (rand() / (RAND_MAX / 35)) + 35;		
 		// dir may be -1, 0 or 1
 		curve_dir = (rand() / (RAND_MAX / 3)) - 1;
 		curve_next = road_curve + curve_dir;
@@ -179,7 +210,7 @@ void calc_road() {
 			oth_speed = -1;
 		} else {
 			oth_speed = 1;
-		}		
+		}
 		oth_virtual_y_pos = oth_virtual_y_pos + oth_speed;
 		oth_y_p2 = oth_virtual_y_pos >> 2;
 		if (oth_y_pos != oth_y_p2) {
@@ -191,7 +222,9 @@ void calc_road() {
 			oth_y_pos = 0;
 		}
 	}
-	if (oth_position == 0 && road_pos > 0 && road_pos%100 == 0) {
+	if (oth_position == 0 && road_pos >= next_car_pos) {
+		next_car_pos = road_pos + (rand() / (RAND_MAX / 35)) + 35;
+		oth_x_delta = rand() / (RAND_MAX / 3);
 		if (rand() > (RAND_MAX / 2)) {
 			oth_position = 1;
 		} else {
@@ -213,13 +246,17 @@ void check_collision () {
 		is_crash = 1;
 	}
 	// crash with other car
-	if (oth_y_pos > my_y_pos - 3 && oth_y_pos < my_y_pos + 3 && !(oth_x_pos + SPRITE_WIDTH < my_x_pos || oth_x_pos > my_x_pos + SPRITE_WIDTH)) {
+	if (oth_y_pos == my_y_pos - 2 && !(oth_x_pos + SPRITE_WIDTH - 1 < my_x_pos || oth_x_pos > my_x_pos + SPRITE_WIDTH - 1)) {
 		is_crash = 1;
 	}
-	if (is_crash == 1) {
+	if (oth_y_pos > my_y_pos - 2 && oth_y_pos < my_y_pos + 3 && !(oth_x_pos + SPRITE_WIDTH < my_x_pos || oth_x_pos > my_x_pos + SPRITE_WIDTH)) {
+		is_crash = 1;
+	}
+	if (is_crash == 1 && crash == 0) {
 		gal_gotoxy(13, 0); gal_puts("CRASH!");
 		draw_speed();
 		my_speed = 0;
+		crash = 1;
 		collision--;
 		if (collision == 0) {
 			gal_gotoxy(11, 0); gal_puts("YOU LOOSE!");
@@ -238,6 +275,7 @@ int main() {
 	rnd = z80_wpeek(RND_ADDR);
 	srand(rnd);
 	gal_cls();
+	frame();
 	do {
 		gal_cls();
 		draw_bg();
@@ -245,27 +283,33 @@ int main() {
 		my_x_pos = MY_START_X_POS;
 		my_y_pos = MY_START_Y_POS;
 		road_pos = 0;
-		next_curve_pos = 100;
-		next_car_pos = 0;
+		next_curve_pos = 60;
+		next_car_pos = 40;
 		road_curve = 0;
 		road_curve_old = 0;
 		curve_x_delta = 0;
+		crash = 0;
 		collision = MAX_COLLISION;
 		my_speed = 0;
 		oth_position = 0;
 		oth_y_pos = 0;
 		oth_virtual_y_pos = 0;
 		oth_speed = 0;
+		oth_x_delta = 0;
 		
 		draw_speed();
 		draw_sprite(my_x_pos, my_y_pos, SPRITE_N_MY, SPRITE_DRAW);		
 		do {
 			calc_road();
 			draw_road();
+			if (road_curve != 0 && road_pos%4 == 0) {
+				scroll_bg(road_curve);
+			}
 			c = getk();
 			switch (c) {
 				case 45: // left 
 				case 46: // right
+					crash = 0;
 					draw_sprite(my_x_pos, my_y_pos, SPRITE_N_MY, SPRITE_CLEAR);
 					if (c == 45) {
 						my_x_pos--;
@@ -275,11 +319,13 @@ int main() {
 					draw_sprite(my_x_pos, my_y_pos, SPRITE_N_MY, SPRITE_DRAW);
 					break;
 				case 43: // up
+					crash = 0;
 					gal_gotoxy(13, 0); gal_puts("      ");
 					my_speed = 1;
 					draw_speed();
 					break;
 				case 44: // down
+					crash = 0;
 					my_speed = 0;
 					draw_speed();
 					break;
@@ -290,7 +336,7 @@ int main() {
 				default:
 					break;
 			}
-			if (road_curve != 0 && my_speed > 0 && road_pos%2 == 0) {
+			if (road_curve != 0 && my_speed > 0 && road_pos%2 == 0 && c != 45 && c != 46) {
 				draw_sprite(my_x_pos, my_y_pos, SPRITE_N_MY, SPRITE_CLEAR);
 				my_x_pos = my_x_pos - curve_x_delta;
 				draw_sprite(my_x_pos, my_y_pos, SPRITE_N_MY, SPRITE_DRAW);
