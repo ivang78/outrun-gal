@@ -14,3 +14,6 @@ Compiling instructions:
 ## Releases
 
 Repo contains built GTP (Galaksija Tape) file **outrun.gtp** and WAV file **outrun.wav**.  
+
+Try a game in [online emulator GAL-E](https://galaksija.net/?load=ivanoutrun)  
+Big thanks to Dragoljub Obradović for hosting game at his [emulator page](https://galaksija.net/)! 
